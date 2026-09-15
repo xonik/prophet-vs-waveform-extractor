@@ -1,13 +1,12 @@
 /**
  * Prophet VS factory wavetable ROM decoder.
  *
- * ROM layout (reverse-engineered from PVSMSB.BIN / PVSLSB.BIN, cross-checked
- * against the known VS-WAVES.DAT reference dump — see README.md):
+ * ROM layout:
  *
  *   - The two ROM chip images are interleaved byte-for-byte into one flat
  *     memory image: mem[0]=MSB[0], mem[1]=LSB[0], mem[2]=MSB[1], ...
- *   - The wavetable region starts at a fixed byte offset ("tableStartBytes")
- *     into that interleaved image.
+ *   - The factory wavetable starts at the absolute byte address of the first
+ *     valid wave, waveform index 32: `tableStartBytes = 47296`.
  *   - From there, every waveform occupies a fixed-size "slot" of `slotSize`
  *     bytes (192, confirmed empirically). Each slot is:
  *       - `headSize` bytes (128) of plain SIGNED 8-BIT samples, one byte per
@@ -19,47 +18,52 @@
  *   - The two parts recombine as:
  *         sample12 = headByte * 16 + fineNibble        (range -2048..2047)
  *         sample16 = sample12 * 16                     (range -32768..32752,
- *                                                        low nibble always 0,
- *                                                        matches VS-WAVES.DAT)
+ *                                                        low nibble always 0)
  *
- *   - ROM slot index and VS-WAVES.DAT waveform index are related by a fixed
- *     offset: romIndex = vsIndex + romOffset (romOffset confirmed = 48).
- *     E.g. VS-WAVES wave 32 (cosine) is ROM slot 80.
+ *   - The ROM table is anchored at the first real factory waveform, so the
+ *     relative slot index is `romIndex = waveformIndex + romOffset` with
+ *     `romOffset = -32`. That makes waveform 32 start at exactly
+ *     `tableStartBytes + 0 * slotSize = 47296`.
  *
- * This decode was validated against VS-WAVES.DAT across all 95 available
- * factory waves (VS index 32-126): mean sample correlation 0.99999, mean
- * RMS error ~41 out of a +/-32768 range (~0.13%), with a small, symmetric,
- * noise-like residual left over (most likely dither/measurement noise in
- * how the reference dump itself was captured, not a missed encoding detail).
  */
 
-export interface DecodeConfig {
-  /** Byte offset into the interleaved MSB/LSB memory image where ROM slot 0 begins. */
-  tableStartBytes: number;
-  /** Total size in bytes of one waveform's ROM slot. */
-  slotSize: number;
-  /** Number of leading bytes in a slot that are plain 8-bit samples. */
-  headSize: number;
-  /** romIndex = vsIndex + romOffset */
-  romOffset: number;
-}
-
-export const DEFAULT_CONFIG: DecodeConfig = {
-  tableStartBytes: 31936,
-  slotSize: 192,
-  headSize: 128,
-  romOffset: 48,
-};
+export const TABLE_START_BYTES = 47296;
+export const SLOT_SIZE = 192;
+export const HEAD_SIZE = 128;
+export const ROM_OFFSET = -32;
 
 export interface DecodedWave {
-  /** VS-WAVES.DAT waveform index (0-127). */
-  vsIndex: number;
-  /** ROM slot index this was decoded from. */
+  /** Waveform index in the Prophet VS waveform table (0-127). */
+  waveformIndex: number;
+  /** Absolute ROM-table offset for this waveform. */
   romIndex: number;
   /** True 12-bit signed samples, range -2048..2047. */
   samples12: Int16Array;
-  /** Samples scaled to 16-bit (matches VS-WAVES.DAT convention: value*16, low nibble always 0). */
+  /** Samples scaled to 16-bit (factory waveform convention: value*16, low nibble always 0). */
   samples16: Int16Array;
+}
+
+export const FIRST_FACTORY_WAVE = 32;
+export const LAST_FACTORY_WAVE = 125;
+
+/** The Prophet VS ROM-backed factory waveforms occupy a fixed, validated range: 32..125.
+ * Indices before 32 are user/RAM waves, and 126/127 are the silent/noise placeholders.
+ */
+function validateWaveRange(startIndex: number, count: number): void {
+  if (!Number.isInteger(startIndex) || !Number.isInteger(count) || count < 0) {
+    throw new Error(`Invalid waveform range: startIndex=${startIndex}, count=${count}`);
+  }
+  if (startIndex < FIRST_FACTORY_WAVE) {
+    throw new Error(
+      `Waveform indices before ${FIRST_FACTORY_WAVE} are not valid for the ROM-backed factory set; got startIndex=${startIndex}.`
+    );
+  }
+  const endIndexExclusive = startIndex + count;
+  if (endIndexExclusive > LAST_FACTORY_WAVE + 1) {
+    throw new Error(
+      `Waveform range must end at or before ${LAST_FACTORY_WAVE}; got startIndex=${startIndex}, count=${count}.`
+    );
+  }
 }
 
 /** Interleave the two ROM chip images into one flat memory image (MSB0,LSB0,MSB1,LSB1,...). */
@@ -77,35 +81,34 @@ export function interleaveRom(msb: Buffer, lsb: Buffer): Uint8Array {
   return mem;
 }
 
-/** How many ROM slots fit in the given interleaved memory image, given the decode config. */
-export function availableRomSlots(mem: Uint8Array, config: DecodeConfig = DEFAULT_CONFIG): number {
-  const usable = mem.length - config.tableStartBytes;
+/** How many ROM slots fit in the given interleaved memory image. */
+export function availableRomSlots(mem: Uint8Array): number {
+  const usable = mem.length - TABLE_START_BYTES;
   if (usable < 0) return 0;
-  return Math.floor(usable / config.slotSize);
+  return Math.floor(usable / SLOT_SIZE);
 }
 
 /**
- * Decode a single waveform by its VS-WAVES.DAT index.
+ * Decode a single waveform by its index.
  * Returns null if the corresponding ROM slot falls outside the available data.
  */
-export function decodeWave(
-  mem: Uint8Array,
-  vsIndex: number,
-  config: DecodeConfig = DEFAULT_CONFIG
-): DecodedWave | null {
-  const romIndex = vsIndex + config.romOffset;
+export function decodeWave(mem: Uint8Array, waveformIndex: number): DecodedWave | null {
+  if (waveformIndex < FIRST_FACTORY_WAVE || waveformIndex > LAST_FACTORY_WAVE) {
+    return null;
+  }
+  const romIndex = waveformIndex + ROM_OFFSET;
   if (romIndex < 0) return null;
 
-  const slotStart = config.tableStartBytes + romIndex * config.slotSize;
-  const slotEnd = slotStart + config.slotSize;
+  const slotStart = TABLE_START_BYTES + romIndex * SLOT_SIZE;
+  const slotEnd = slotStart + SLOT_SIZE;
   if (slotStart < 0 || slotEnd > mem.length) return null;
 
   const headStart = slotStart;
-  const headEnd = slotStart + config.headSize;
+  const headEnd = slotStart + HEAD_SIZE;
   const tailStart = headEnd;
   const tailEnd = slotEnd;
 
-  const nSamples = config.headSize; // one head byte per sample
+  const nSamples = HEAD_SIZE; // one head byte per sample
   const samples12 = new Int16Array(nSamples);
   const samples16 = new Int16Array(nSamples);
 
@@ -129,19 +132,19 @@ export function decodeWave(
     samples16[j] = s12 * 16; // -32768..32752, low nibble always 0
   }
 
-  return { vsIndex, romIndex, samples12, samples16 };
+  return { waveformIndex, romIndex, samples12, samples16 };
 }
 
-/** Decode a contiguous range of VS-WAVES.DAT waveform indices, skipping any that fall out of range. */
+/** Decode a contiguous range of waveform indices, skipping any that fall out of range. */
 export function decodeWaveRange(
   mem: Uint8Array,
   startIndex: number,
-  count: number,
-  config: DecodeConfig = DEFAULT_CONFIG
+  count: number
 ): DecodedWave[] {
+  validateWaveRange(startIndex, count);
   const out: DecodedWave[] = [];
-  for (let vsIndex = startIndex; vsIndex < startIndex + count; vsIndex++) {
-    const wave = decodeWave(mem, vsIndex, config);
+  for (let waveformIndex = startIndex; waveformIndex < startIndex + count; waveformIndex++) {
+    const wave = decodeWave(mem, waveformIndex);
     if (wave) out.push(wave);
   }
   return out;

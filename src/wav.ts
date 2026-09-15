@@ -1,5 +1,5 @@
 /**
- * Minimal mono 16-bit PCM WAV file writer (no external dependencies).
+ * Minimal mono 16-bit PCM WAV file writer with no external dependencies.
  */
 
 export function buildWavBuffer(samples16: Int16Array, sampleRate: number): Buffer {

@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildCppHeader = buildCppHeader;
-function arrayName(prefix, vsIndex) {
-    return `${prefix}_${String(vsIndex).padStart(3, "0")}`;
+function arrayName(prefix, waveformIndex) {
+    return `${prefix}_${String(waveformIndex).padStart(3, "0")}`;
 }
 function formatArray(values) {
     const rows = [];
@@ -32,22 +32,22 @@ function buildCppHeader(waves, opts) {
     lines.push(`namespace ${opts.namespaceName} {`);
     lines.push(``);
     for (const wave of waves) {
-        const name = arrayName(opts.arrayPrefix, wave.vsIndex);
+        const name = arrayName(opts.arrayPrefix, wave.waveformIndex);
         const values = wave[opts.which];
-        lines.push(`// VS-WAVES index ${wave.vsIndex} (ROM slot ${wave.romIndex})`);
+        lines.push(`// waveform index ${wave.waveformIndex} (ROM table offset ${wave.romIndex})`);
         lines.push(`inline constexpr int16_t ${name}[${values.length}] = {`);
         lines.push(formatArray(values));
         lines.push(`};`);
         lines.push(``);
     }
     lines.push(`inline constexpr int${opts.arrayPrefix === "" ? "" : ""} ${opts.tableName}Count = ${waves.length};`);
-    lines.push(`inline constexpr int ${opts.tableName}VsIndex[${waves.length}] = {`);
-    lines.push(formatArray(waves.map((w) => w.vsIndex)));
+    lines.push(`inline constexpr int ${opts.tableName}WaveformIndex[${waves.length}] = {`);
+    lines.push(formatArray(waves.map((w) => w.waveformIndex)));
     lines.push(`};`);
     lines.push(`inline constexpr const int16_t* const ${opts.tableName}[${waves.length}] = {`);
     lines.push(waves
         .map((w, i) => {
-        const name = arrayName(opts.arrayPrefix, w.vsIndex);
+        const name = arrayName(opts.arrayPrefix, w.waveformIndex);
         return "    " + name + (i + 1 < waves.length ? "," : "");
     })
         .join("\n"));

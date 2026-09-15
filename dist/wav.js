@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Minimal mono 16-bit PCM WAV file writer (no external dependencies).
+ * Minimal mono 16-bit PCM WAV file writer with no external dependencies.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildWavBuffer = buildWavBuffer;

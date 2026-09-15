@@ -1,15 +1,39 @@
 # Prophet VS wavetable ROM converter
 
-Decodes the Sequential Prophet VS factory wavetable ROM images
-(`PVSMSB.BIN` / `PVSLSB.BIN`) into WAV files and C++ headers, using the ROM
-format reverse-engineered against the reference `VS-WAVES.DAT` dump.
+Decodes the Sequential Prophet VS factory wavetables from ROM images
+(called `PVSMSB.BIN` / `PVSLSB.BIN` here - that's not their original names, 
+you need to find the ROMs yourself on the internet) into WAV files and C++ headers.
+
+![Prophet VS waveform chart preview](media/chart_preview_full_1.png)
+
 The dump can be found here: https://www.sequencer.de/synthesizer/threads/prophet-vs-waves.121446/
+
+## Why does this script exist?
+
+The waves are originally stored in the two prophet VS roms (MSB/high and LSB/low).
+
+There are several version of the extracted VS waveforms out there. In particular, I found
+one version with each wave in .AIF format, 336 samples per wave. There are also
+several others, adapted for various synths. Some are upsampled, many are
+payware.
+
+The .aif one in particular is a bit weird. There are 94 waveforms in the
+Prophet VS, plus 2 special ones (silence and white noise, which is generated
+on the fly). The .aif one has 104, and there are gaps in the numbering. Also, 
+after comparing the waves with known visualisations of each wave, it's clear 
+that they are either reversed/inverted or do not start and stop at the correct 
+phase. It may not be a problem, but I wanted the very original ones, untouched 
+by humans so to speak.
+
+I also verified the ROM decode against a reference dump created during research,
+but the ROM remains the defining source of truth for the waveform content.
+
 ## The ROM format
 
 - The two ROM chip dumps are interleaved byte-for-byte into one memory
   image: `mem[0]=MSB[0], mem[1]=LSB[0], mem[2]=MSB[1], ...`
-- The wavetable region starts at a fixed byte offset (`tableStartBytes =
-  31936`) into that interleaved image.
+- The factory wavetable starts at the absolute byte address of the first
+  valid waveform (`tableStartBytes = 47296`) in the interleaved image.
 - From there, each waveform occupies a fixed 192-byte "slot":
   - The first **128 bytes** are plain **signed 8-bit** samples, one byte per
     waveform sample — the coarse part of each 12-bit sample.
@@ -17,19 +41,11 @@ The dump can be found here: https://www.sequencer.de/synthesizer/threads/prophet
     nibble first: `tailByte[i]` holds the fine nibble for sample `2*i` in
     its upper 4 bits and for sample `2*i+1` in its lower 4 bits.
   - They recombine as `sample12 = int8(headByte) * 16 + fineNibble`
-    (range -2048..2047), and `sample16 = sample12 * 16` (matches the
-    `VS-WAVES.DAT` convention, whose low nibble is always 0).
-- ROM slot index and `VS-WAVES.DAT` waveform index differ by a fixed
-  offset: `romIndex = vsIndex + 48` (e.g. VS wave 32, the cosine, is ROM
-  slot 80).
-
-This was validated against all 95 available factory waves (VS index
-32-126): mean sample correlation 0.99999, mean RMS error ~41 out of a
-+/-32768 range (~0.13%), with a small, symmetric, noise-like residual left
-over.
-
-All of the above are configurable command-line flags if you want to
-experiment with different assumptions (see `--help`).
+    (range -2048..2047). Upconverting to 16 bit simply left shifts by four
+    keeping the lowest bits at 0
+    
+- In ROM, the first factory waveform (VS wave 32) begins at absolute byte
+  address 47296 in the interleaved image.
 
 ## Setup
 
@@ -45,6 +61,15 @@ Run directly with `ts-node` (no build step needed):
 npx ts-node src/convert.ts \
   --msb /path/to/PVSMSB.BIN \
   --lsb /path/to/PVSLSB.BIN \
+  --out ./output \
+  --all
+```
+
+Or decode a prebuilt VS-WAVES.DAT dump instead of the physical ROM images:
+
+```sh
+npx ts-node src/convert.ts \
+  --vswave /path/to/VS-WAVES.DAT \
   --out ./output \
   --all
 ```
@@ -78,44 +103,31 @@ Pass any combination of these flags (default: all of them, if none given):
 
 The chart plots every decoded waveform on the same fixed y-axis (the full
 16-bit or 12-bit range, depending on `--chart-which`), so waveform shapes and
-amplitudes are directly comparable at a glance — the same kind of grid used
-to validate the ROM decode against `VS-WAVES.DAT` during development.
+amplitudes are directly comparable at a glance.
 
 ### Other options
 
 ```
 --out <dir>           Output directory (default: ./output)
---start <n>           First VS-WAVES.DAT waveform index to decode (default: 32)
+--start <n>           Waveform index to decode (default: 32)
 --count <n>           Number of waveform indices to attempt (default: 94, i.e. up to
                        index 125 — see "Default range" below)
---rom-offset <n>      romIndex = vsIndex + romOffset (default: 48)
---table-start <n>     Byte offset of ROM slot 0 in the interleaved image (default: 31936)
---slot-size <n>       Bytes per ROM waveform slot (default: 192)
---head-size <n>       Bytes of plain 8-bit samples at the start of each slot (default: 128)
+--vswave <path>       Decode directly from a VS-WAVES.DAT dump instead of MSB/LSB ROM images
 --sample-rate <n>     Sample rate written into WAV headers (default: 32000 — arbitrary;
                        the real VS oscillator rate depends on the note/pitch played)
 --verbose             Print per-wave progress
 --help                Show usage
 ```
 
-Waveform indices whose corresponding ROM slot falls outside the ROM data
-(e.g. requesting indices beyond what the dump contains) are silently
-skipped, with a summary line printed at the end.
+The ROM-backed factory waveform set is fixed to VS indices 32..125. Requests
+that try to start before 32 or extend past 125 are rejected.
 
 ## Default range
 
-By default the converter decodes the 94 factory waveforms, VS-WAVES indices
-**32-125** (`--start 32 --count 94`), skipping:
+By default the converter decodes the 94 factory waveforms, indices
+**32-125** (`--start 32 --count 94`). This is the only validated ROM-backed
+range, and it is intentionally enforced:
 
-- **0-31** — the user-programmable slots. They don't have a fixed factory
-  ROM counterpart the way 32-125 do, so decoding them with the default
-  `--rom-offset 48` would produce *something*, but it's unvalidated.
-- **126** — the last available ROM slot, which is silent/empty.
-
-Pass `--start 0 --count 128` to get every index the ROM data can produce
-instead.
-
-## Notes
-
-- Wave 127 (and generally, whatever sits past the last physical ROM slot)
-  will simply be skipped as out of range, regardless of `--count`.
+- **0-31** — user-programmable RAM slots, not part of the factory ROM set.
+- **126** — silent placeholder wave.
+- **127** — generated noise waveform, not a stored ROM waveform.

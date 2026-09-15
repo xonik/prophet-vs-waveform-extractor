@@ -13,7 +13,7 @@ function escapeXml(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 /** Build one small self-contained SVG plotting a single waveform's samples. */
-function svgForWave(samples, width, height, vsIndex, romIndex, yMin, yMax) {
+function svgForWave(samples, width, height, waveformIndex, romIndex, yMin, yMax) {
     const padTop = 4;
     const padBottom = 4;
     const padSide = 4;
@@ -33,7 +33,7 @@ function svgForWave(samples, width, height, vsIndex, romIndex, yMin, yMax) {
         `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#dddddd"/>`,
         `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#cccccc" stroke-width="1"/>`,
         `<polyline points="${points.join(" ")}" fill="none" stroke="#d97706" stroke-width="1.2"/>`,
-        `<text x="4" y="12" font-family="monospace" font-size="10" fill="#333333">vs${vsIndex} (rom${romIndex})</text>`,
+        `<text x="4" y="12" font-family="monospace" font-size="10" fill="#333333">wave${waveformIndex} (rom${romIndex})</text>`,
         `</svg>`,
     ].join("");
 }
@@ -43,7 +43,7 @@ function buildWaveformChartHtml(waves, opts = exports.DEFAULT_CHART_OPTIONS) {
     const tiles = waves
         .map((w) => {
         const values = w[opts.which];
-        const svg = svgForWave(values, opts.tileWidth, opts.tileHeight, w.vsIndex, w.romIndex, yMin, yMax);
+        const svg = svgForWave(values, opts.tileWidth, opts.tileHeight, w.waveformIndex, w.romIndex, yMin, yMax);
         return `<div class="tile">${svg}</div>`;
     })
         .join("\n");
