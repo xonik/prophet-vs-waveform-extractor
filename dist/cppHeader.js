@@ -35,8 +35,11 @@ function buildCppHeader(waves, opts) {
     for (const wave of waves) {
         const name = arrayName(opts.arrayPrefix, wave.waveformIndex);
         const values = wave[opts.which];
-        const waveformName = waveformNames_1.waveformNames[wave.waveformIndex - 32]?.pvs ?? "?";
-        lines.push(`// waveform index ${wave.waveformIndex} (${waveformName}, ROM table offset ${wave.romIndex})`);
+        const entry = waveformNames_1.waveformNames[wave.waveformIndex - 32];
+        const pvsName = entry?.pvs ?? "?";
+        const evolverName = entry?.evolver ?? "?";
+        const label = pvsName === evolverName ? pvsName : `${pvsName} (${evolverName})`;
+        lines.push(`// waveform index ${wave.waveformIndex} (${label}, ROM table offset ${wave.romIndex})`);
         lines.push(`inline constexpr int16_t ${name}[${values.length}] = {`);
         lines.push(formatArray(values));
         lines.push(`};`);

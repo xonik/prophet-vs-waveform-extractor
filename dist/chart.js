@@ -35,7 +35,7 @@ function svgForWave(samples, width, height, waveformIndex, romIndex, yMin, yMax)
     return [
         `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`,
         `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#dddddd"/>`,
-        `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#333333">wave${waveformIndex} ${name}</text>`,
+        `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#333333">${waveformIndex} - ${name}</text>`,
         `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#cccccc" stroke-width="1"/>`,
         `<polyline points="${points.join(" ")}" fill="none" stroke="#d97706" stroke-width="1.2"/>`,
         `</svg>`,
