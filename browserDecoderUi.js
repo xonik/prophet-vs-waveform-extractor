@@ -1,4 +1,7 @@
 (function () {
+  const zipSync = typeof module !== "undefined" && module.exports
+    ? require("fflate").zipSync
+    : (typeof window !== "undefined" && window.fflate ? window.fflate.zipSync : undefined);
   const waveformNames = [
     { pvs: "Sine", evolver: "Sine" },
     { pvs: "Saw", evolver: "Sawtooth" },
@@ -284,14 +287,14 @@
   }
 
   function zipFiles(entries) {
-    if (!window.fflate || typeof window.fflate.zipSync !== "function") {
+    if (typeof zipSync !== "function") {
       throw new Error("Zip support failed to load.");
     }
     const zipEntries = {};
     for (const entry of entries) {
       zipEntries[entry.name] = entry.data;
     }
-    return window.fflate.zipSync(zipEntries);
+    return zipSync(zipEntries);
   }
 
   function buildHeaderFile(waves, which) {

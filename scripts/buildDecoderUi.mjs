@@ -1,4 +1,15 @@
-<!doctype html>
+import { build } from "esbuild";
+import { writeFileSync } from "fs";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, "..");
+const jsPath = path.join(repoRoot, "browserDecoderUi.js");
+const outPath = path.join(repoRoot, "decoder-ui-standalone.html");
+
+const htmlTemplate = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -162,7 +173,6 @@
         color: var(--muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
-
     </style>
   </head>
   <body>
@@ -222,8 +232,24 @@
         <div id="results" class="results"></div>
       </div>
     </div>
-
-    <script src="node_modules/fflate/umd/index.js"></script>
-    <script src="browserDecoderUi.js"></script>
+    <script>
+__INLINE_SCRIPT__
+    </script>
   </body>
 </html>
+`;
+
+const bundleResult = await build({
+  entryPoints: [jsPath],
+  bundle: true,
+  write: false,
+  format: "iife",
+  platform: "browser",
+  minify: false,
+});
+
+const bundledJs = bundleResult.outputFiles[0].text;
+const standaloneHtml = htmlTemplate.replace("__INLINE_SCRIPT__", bundledJs);
+
+writeFileSync(outPath, standaloneHtml);
+console.log(`Wrote ${path.relative(repoRoot, outPath)}`);
