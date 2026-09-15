@@ -2,9 +2,10 @@
  * C++ header generation: each waveform emitted as an inline `int16_t` array.
  */
 import { DecodedWave } from "./decodeROM";
+import { waveformNames } from "./waveformNames";
 
 function arrayName(prefix: string, waveformIndex: number): string {
-  return `${prefix}_${String(waveformIndex).padStart(3, "0")}`;
+  return `${prefix}_${waveformIndex}`;
 }
 
 function formatArray(values: ArrayLike<number>): string {
@@ -51,7 +52,8 @@ export function buildCppHeader(waves: DecodedWave[], opts: HeaderOptions): strin
   for (const wave of waves) {
     const name = arrayName(opts.arrayPrefix, wave.waveformIndex);
     const values = wave[opts.which];
-    lines.push(`// waveform index ${wave.waveformIndex} (ROM table offset ${wave.romIndex})`);
+    const waveformName = waveformNames[wave.waveformIndex - 32]?.pvs ?? "?";
+    lines.push(`// waveform index ${wave.waveformIndex} (${waveformName}, ROM table offset ${wave.romIndex})`);
     lines.push(`inline constexpr int16_t ${name}[${values.length}] = {`);
     lines.push(formatArray(values));
     lines.push(`};`);

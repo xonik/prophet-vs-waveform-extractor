@@ -4,6 +4,7 @@
  * dependency
  */
 import { DecodedWave } from "./decodeROM";
+import { waveformNames } from "./waveformNames";
 
 export interface ChartOptions {
   /** Waveform "columns" per row of the grid. */
@@ -38,28 +39,31 @@ function svgForWave(
   yMin: number,
   yMax: number
 ): string {
-  const padTop = 4;
-  const padBottom = 4;
+  const padTop = 18;
+  const titleHeight = 12;
+  const padBottom = 6;
   const padSide = 4;
+  const plotY = padTop + titleHeight + 2;
   const plotW = width - 2 * padSide;
-  const plotH = height - padTop - padBottom;
+  const plotH = height - plotY - padBottom;
+  const name = waveformNames[waveformIndex - 32]?.pvs ?? "?";
 
   const n = samples.length;
   const points: string[] = [];
   for (let i = 0; i < n; i++) {
     const x = padSide + (n <= 1 ? 0 : (i / (n - 1)) * plotW);
     const norm = (samples[i] - yMin) / (yMax - yMin); // 0..1
-    const y = padTop + (1 - norm) * plotH;
+    const y = plotY + (1 - norm) * plotH;
     points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
   }
-  const zeroY = (padTop + (1 - (0 - yMin) / (yMax - yMin)) * plotH).toFixed(1);
+  const zeroY = (plotY + (1 - (0 - yMin) / (yMax - yMin)) * plotH).toFixed(1);
 
   return [
     `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`,
     `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#dddddd"/>`,
+    `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#333333">${waveformIndex} - ${name}</text>`,
     `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#cccccc" stroke-width="1"/>`,
     `<polyline points="${points.join(" ")}" fill="none" stroke="#d97706" stroke-width="1.2"/>`,
-    `<text x="4" y="12" font-family="monospace" font-size="10" fill="#333333">wave${waveformIndex} (rom${romIndex})</text>`,
     `</svg>`,
   ].join("");
 }

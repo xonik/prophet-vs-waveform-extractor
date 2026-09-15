@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_CHART_OPTIONS = void 0;
 exports.buildWaveformChartHtml = buildWaveformChartHtml;
+const waveformNames_1 = require("./waveformNames");
 exports.DEFAULT_CHART_OPTIONS = {
     columns: 10,
     tileWidth: 190,
@@ -14,26 +15,29 @@ function escapeXml(s) {
 }
 /** Build one small self-contained SVG plotting a single waveform's samples. */
 function svgForWave(samples, width, height, waveformIndex, romIndex, yMin, yMax) {
-    const padTop = 4;
-    const padBottom = 4;
+    const padTop = 18;
+    const titleHeight = 12;
+    const padBottom = 6;
     const padSide = 4;
+    const plotY = padTop + titleHeight + 2;
     const plotW = width - 2 * padSide;
-    const plotH = height - padTop - padBottom;
+    const plotH = height - plotY - padBottom;
+    const name = waveformNames_1.waveformNames[waveformIndex - 32]?.pvs ?? "?";
     const n = samples.length;
     const points = [];
     for (let i = 0; i < n; i++) {
         const x = padSide + (n <= 1 ? 0 : (i / (n - 1)) * plotW);
         const norm = (samples[i] - yMin) / (yMax - yMin); // 0..1
-        const y = padTop + (1 - norm) * plotH;
+        const y = plotY + (1 - norm) * plotH;
         points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     }
-    const zeroY = (padTop + (1 - (0 - yMin) / (yMax - yMin)) * plotH).toFixed(1);
+    const zeroY = (plotY + (1 - (0 - yMin) / (yMax - yMin)) * plotH).toFixed(1);
     return [
         `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`,
         `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#dddddd"/>`,
+        `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#333333">wave${waveformIndex} ${name}</text>`,
         `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#cccccc" stroke-width="1"/>`,
         `<polyline points="${points.join(" ")}" fill="none" stroke="#d97706" stroke-width="1.2"/>`,
-        `<text x="4" y="12" font-family="monospace" font-size="10" fill="#333333">wave${waveformIndex} (rom${romIndex})</text>`,
         `</svg>`,
     ].join("");
 }

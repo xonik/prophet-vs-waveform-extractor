@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildCppHeader = buildCppHeader;
+const waveformNames_1 = require("./waveformNames");
 function arrayName(prefix, waveformIndex) {
-    return `${prefix}_${String(waveformIndex).padStart(3, "0")}`;
+    return `${prefix}_${waveformIndex}`;
 }
 function formatArray(values) {
     const rows = [];
@@ -34,7 +35,8 @@ function buildCppHeader(waves, opts) {
     for (const wave of waves) {
         const name = arrayName(opts.arrayPrefix, wave.waveformIndex);
         const values = wave[opts.which];
-        lines.push(`// waveform index ${wave.waveformIndex} (ROM table offset ${wave.romIndex})`);
+        const waveformName = waveformNames_1.waveformNames[wave.waveformIndex - 32]?.pvs ?? "?";
+        lines.push(`// waveform index ${wave.waveformIndex} (${waveformName}, ROM table offset ${wave.romIndex})`);
         lines.push(`inline constexpr int16_t ${name}[${values.length}] = {`);
         lines.push(formatArray(values));
         lines.push(`};`);
