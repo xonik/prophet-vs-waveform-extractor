@@ -1,13 +1,14 @@
 import { build } from "esbuild";
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const jsPath = path.join(repoRoot, "browserDecoderUi.js");
-const outPath = path.join(repoRoot, "decoder-ui-standalone.html");
+const uiDir = path.join(repoRoot, "ui");
+const jsPath = path.join(__dirname, "browserDecoderUi.js");
+const outPath = path.join(uiDir, "decoder-ui.html");
 
 const htmlTemplate = `<!doctype html>
 <html lang="en">
@@ -173,6 +174,22 @@ const htmlTemplate = `<!doctype html>
         color: var(--muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
+
+      p.intro-text {
+        margin: 10px 0 24px;
+        color: var(--text);
+        line-height: 1.5;
+      }
+
+      p.lead {
+        margin: 32px 0 20px;
+        color: var(--muted);
+      }
+
+      p.section-text {
+        margin: 32px 0 16px;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -180,6 +197,10 @@ const htmlTemplate = `<!doctype html>
       <h1>Prophet VS ROM decoder</h1>
 
       <div class="card">
+        <p class="intro-text">This page lets you decode the Prophet VS factory waveform data from either the original ROM pair or a VS-WAVES.DAT dump, preview the selected waveforms in the browser, and save them in the output format you want.</p>
+
+        <p class="lead">Select either two ROM files or one VS-WAVES.DAT file</p>
+
         <div class="controls">
           <div class="source-row">
             <div class="source-box">
@@ -199,19 +220,23 @@ const htmlTemplate = `<!doctype html>
               <input id="vswave-file" type="file" accept=".bin,.rom,.dat,.wav" />
             </div>
           </div>
+        </div>
 
+        <p class="section-text">Then select what waveforms to decode and how to output it before pressing "Decode waveforms"</p>
+
+        <div class="controls">
           <div>
-            <label for="start-index">Waveform start</label>
+            <label for="start-index">First waveform to decode</label>
             <input id="start-index" type="number" min="32" max="125" value="32" />
           </div>
 
           <div>
-            <label for="count">Waveform count</label>
+            <label for="count">Number of waveforms to decode</label>
             <input id="count" type="number" min="1" max="94" value="94" />
           </div>
 
           <div>
-            <label for="bit-depth">Bit depth</label>
+            <label for="bit-depth">Bit depth in output</label>
             <select id="bit-depth" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:white;">
               <option value="16">16-bit</option>
               <option value="12">12-bit</option>
@@ -221,14 +246,20 @@ const htmlTemplate = `<!doctype html>
 
         <div class="button-row">
           <button id="decode-button" type="button">Decode waveforms</button>
+        </div>
+
+        <p class="section-text">Finally, select what to save</p>
+
+        <div class="button-row">
           <button id="save-separate-raw" type="button" class="secondary" disabled>Save separate raw ZIP</button>
           <button id="save-separate-wavs" type="button" class="secondary" disabled>Save separate WAVs ZIP</button>
           <button id="save-combined-wav" type="button" class="secondary" disabled>Save combined WAV</button>
           <button id="save-header" type="button" class="secondary" disabled>Save C++ header</button>
           <button id="save-chart" type="button" class="secondary" disabled>Save chart HTML</button>
         </div>
-
-        <p id="status" class="status">Select either the two ROM files or a VS-WAVES.DAT file to begin.</p>
+        
+        <div id="status" class="status"></div>
+        
         <div id="results" class="results"></div>
       </div>
     </div>
@@ -251,5 +282,6 @@ const bundleResult = await build({
 const bundledJs = bundleResult.outputFiles[0].text;
 const standaloneHtml = htmlTemplate.replace("__INLINE_SCRIPT__", bundledJs);
 
+mkdirSync(uiDir, { recursive: true });
 writeFileSync(outPath, standaloneHtml);
 console.log(`Wrote ${path.relative(repoRoot, outPath)}`);

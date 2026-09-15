@@ -1,7 +1,7 @@
 import { buildCppHeader } from "./cppHeader";
 import { buildWaveformChartHtml, ChartOptions, DEFAULT_CHART_OPTIONS } from "./chart";
 import { DecodedWave } from "./decodeROM";
-import { buildWavBuffer, concatSamples } from "./wav";
+import { buildWavBuffer, buildWavBytes, concatSamples } from "./wav";
 
 function wavSamplesFor(wave: DecodedWave, which: "samples12" | "samples16"): Int16Array {
   return which === "samples16" ? wave.samples16 : wave.samples12;
@@ -23,6 +23,25 @@ export function buildSeparateWavBuffers(
   return waves.map((wave) => ({
     waveformIndex: wave.waveformIndex,
     buffer: buildWavBuffer(wavSamplesFor(wave, which), sampleRate),
+  }));
+}
+
+export function buildCombinedWavBytes(
+  waves: DecodedWave[],
+  which: "samples12" | "samples16",
+  sampleRate: number
+): Uint8Array {
+  return buildWavBytes(concatSamples(waves.map((wave) => wavSamplesFor(wave, which))), sampleRate);
+}
+
+export function buildSeparateWavBytes(
+  waves: DecodedWave[],
+  which: "samples12" | "samples16",
+  sampleRate: number
+): Array<{ waveformIndex: number; bytes: Uint8Array }> {
+  return waves.map((wave) => ({
+    waveformIndex: wave.waveformIndex,
+    bytes: buildWavBytes(wavSamplesFor(wave, which), sampleRate),
   }));
 }
 
@@ -49,4 +68,13 @@ export function buildChartFile(waves: DecodedWave[], opts: Partial<ChartOptions>
     ...DEFAULT_CHART_OPTIONS,
     ...opts,
   });
+}
+
+export function buildRawBytes(values: ArrayLike<number>): Uint8Array {
+  const buffer = new Uint8Array(values.length * 2);
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  for (let i = 0; i < values.length; i++) {
+    view.setInt16(i * 2, values[i], true);
+  }
+  return buffer;
 }
