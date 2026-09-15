@@ -67,7 +67,7 @@ function validateWaveRange(startIndex: number, count: number): void {
 }
 
 /** Interleave the two ROM chip images into one flat memory image (MSB0,LSB0,MSB1,LSB1,...). */
-export function interleaveRom(msb: Buffer, lsb: Buffer): Uint8Array {
+export function interleaveRom(msb: ArrayLike<number>, lsb: ArrayLike<number>): Uint8Array {
   if (msb.length !== lsb.length) {
     throw new Error(
       `MSB (${msb.length} bytes) and LSB (${lsb.length} bytes) ROM images must be the same length`

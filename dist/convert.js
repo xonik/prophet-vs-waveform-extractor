@@ -58,9 +58,8 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const decodeROM_1 = require("./decodeROM");
 const decodeVswave_1 = require("./decodeVswave");
-const wav_1 = require("./wav");
-const cppHeader_1 = require("./cppHeader");
 const chart_1 = require("./chart");
+const exportShared_1 = require("./exportShared");
 function parseArgs(argv) {
     const opts = {
         outDir: "./output",
@@ -70,14 +69,11 @@ function parseArgs(argv) {
         // silent/noise placeholders.
         startIndex: decodeROM_1.FIRST_FACTORY_WAVE,
         count: decodeROM_1.LAST_FACTORY_WAVE - decodeROM_1.FIRST_FACTORY_WAVE + 1,
+        bitDepth: "samples16",
         sampleRate: 32000,
         wavCombined: false,
         wavSeparate: false,
-        header16: false,
-        data12: false,
-        header12: false,
         chart: false,
-        chartWhich: "samples16",
         chartColumns: chart_1.DEFAULT_CHART_OPTIONS.columns,
         verbose: false,
         help: false,
@@ -85,9 +81,8 @@ function parseArgs(argv) {
     const boolFlags = new Set([
         "--wav-combined",
         "--wav-separate",
-        "--header16",
-        "--data12",
-        "--header12",
+        "--header",
+        "--raw",
         "--chart",
         "--all",
         "--verbose",
@@ -119,41 +114,32 @@ function parseArgs(argv) {
             case "--sample-rate":
                 opts.sampleRate = parseInt(next(), 10);
                 break;
+            case "--bit-depth": {
+                const v = next();
+                if (v !== "16" && v !== "12") {
+                    throw new Error(`--bit-depth must be "16" or "12", got "${v}"`);
+                }
+                opts.bitDepth = v === "12" ? "samples12" : "samples16";
+                break;
+            }
             case "--wav-combined":
                 opts.wavCombined = true;
                 break;
             case "--wav-separate":
                 opts.wavSeparate = true;
                 break;
-            case "--header16":
-                opts.header16 = true;
-                break;
-            case "--data12":
-                opts.data12 = true;
-                break;
-            case "--header12":
-                opts.header12 = true;
+            case "--header":
+            case "--raw":
                 break;
             case "--chart":
                 opts.chart = true;
                 break;
-            case "--chart-which": {
-                const v = next();
-                if (v !== "samples16" && v !== "samples12") {
-                    throw new Error(`--chart-which must be "samples16" or "samples12", got "${v}"`);
-                }
-                opts.chartWhich = v;
-                break;
-            }
             case "--chart-columns":
                 opts.chartColumns = parseInt(next(), 10);
                 break;
             case "--all":
                 opts.wavCombined = true;
                 opts.wavSeparate = true;
-                opts.header16 = true;
-                opts.data12 = true;
-                opts.header12 = true;
                 opts.chart = true;
                 break;
             case "--verbose":
@@ -179,16 +165,12 @@ function parseArgs(argv) {
     // If no specific output was requested (and --all wasn't passed either), default to everything.
     if (!opts.wavCombined &&
         !opts.wavSeparate &&
-        !opts.header16 &&
-        !opts.data12 &&
-        !opts.header12 &&
+        !argv.includes("--header") &&
+        !argv.includes("--raw") &&
         !opts.chart &&
         !opts.help) {
         opts.wavCombined = true;
         opts.wavSeparate = true;
-        opts.header16 = true;
-        opts.data12 = true;
-        opts.header12 = true;
         opts.chart = true;
     }
     return opts;
@@ -205,16 +187,15 @@ Required (choose one input mode):
   --vswave <path>       Path to a VS-WAVES.DAT dump (alternative to ROM images)
 
 Output selection (default: all, if none specified):
-  --wav-combined        One 16-bit WAV file containing all selected waveforms back to back
-  --wav-separate        One 16-bit WAV file per waveform
-  --header16            One C++ header, each waveform as an inline int16_t[] (16-bit scale)
-  --data12              One raw binary file per waveform (int16LE, true 12-bit range)
-  --header12            One C++ header, each waveform as an inline int16_t[] (12-bit range)
+  --wav-combined        One WAV file containing all selected waveforms back to back
+  --wav-separate        One WAV file per waveform
+  --header              One C++ header using the selected bit depth
+  --raw                 One raw binary file per waveform using the selected bit depth
   --chart               One HTML file with a small-multiples SVG chart of every decoded waveform
-  --all                 Shorthand for enabling all six outputs above
+  --all                 Shorthand for enabling all outputs above
 
-Chart options:
-  --chart-which <which> Which values to plot: samples16 (default) or samples12
+Format options:
+  --bit-depth <n>       16 (default) or 12; reused for WAV, binary, header and chart output
   --chart-columns <n>   Waveform tiles per row in the chart grid (default: 10)
 
 Other options:
@@ -233,8 +214,12 @@ Other options:
 function ensureDir(dir) {
     fs.mkdirSync(dir, { recursive: true });
 }
+function hasFlag(argv, flag) {
+    return argv.includes(flag);
+}
 function main() {
-    const opts = parseArgs(process.argv.slice(2));
+    const argv = process.argv.slice(2);
+    const opts = parseArgs(argv);
     if (opts.help) {
         printHelp();
         return;
@@ -256,7 +241,7 @@ function main() {
     let waves;
     let provenance;
     if (opts.vswavePath) {
-        waves = (0, decodeVswave_1.decodeVswaveRange)(opts.vswavePath, opts.startIndex, opts.count);
+        waves = (0, decodeVswave_1.decodeVswaveData)(fs.readFileSync(opts.vswavePath), opts.startIndex, opts.count);
         provenance =
             `Source: ${path.basename(opts.vswavePath)}\n` +
                 `Generated: ${new Date().toISOString()}\n` +
@@ -296,63 +281,43 @@ function main() {
     }
     ensureDir(opts.outDir);
     if (opts.wavCombined) {
-        const all16 = (0, wav_1.concatSamples)(waves.map((w) => w.samples16));
-        const buf = (0, wav_1.buildWavBuffer)(all16, opts.sampleRate);
-        const outPath = path.join(opts.outDir, "prophet_vs_waves_all.wav");
+        const totalSamples = waves.reduce((sum, wave) => sum + wave.samples16.length, 0);
+        const buf = (0, exportShared_1.buildCombinedWavBuffer)(waves, opts.bitDepth, opts.sampleRate);
+        const outPath = path.join(opts.outDir, `prophet_vs_waves_all_${opts.bitDepth === "samples12" ? "12bit" : "16bit"}.wav`);
         fs.writeFileSync(outPath, buf);
-        console.log(`Wrote ${outPath} (${all16.length} samples, ${waves.length} waveforms).`);
+        console.log(`Wrote ${outPath} (${totalSamples} samples, ${waves.length} waveforms).`);
     }
     if (opts.wavSeparate) {
         const dir = path.join(opts.outDir, "wav");
         ensureDir(dir);
-        for (const w of waves) {
-            const buf = (0, wav_1.buildWavBuffer)(w.samples16, opts.sampleRate);
-            const outPath = path.join(dir, `wave_${String(w.waveformIndex).padStart(3, "0")}.wav`);
-            fs.writeFileSync(outPath, buf);
+        for (const entry of (0, exportShared_1.buildSeparateWavBuffers)(waves, opts.bitDepth, opts.sampleRate)) {
+            const outPath = path.join(dir, `wave_${String(entry.waveformIndex).padStart(3, "0")}.wav`);
+            fs.writeFileSync(outPath, entry.buffer);
         }
         console.log(`Wrote ${waves.length} WAV file(s) to ${dir}/`);
     }
-    if (opts.data12) {
-        const dir = path.join(opts.outDir, "data12");
+    if (hasFlag(argv, "--raw")) {
+        const dir = path.join(opts.outDir, opts.bitDepth === "samples12" ? "data12" : "data16");
         ensureDir(dir);
         for (const w of waves) {
-            const buf = Buffer.alloc(w.samples12.length * 2);
-            for (let i = 0; i < w.samples12.length; i++)
-                buf.writeInt16LE(w.samples12[i], i * 2);
-            const outPath = path.join(dir, `wave_${String(w.waveformIndex).padStart(3, "0")}.i12`);
+            const values = w[opts.bitDepth];
+            const buf = Buffer.alloc(values.length * 2);
+            for (let i = 0; i < values.length; i++)
+                buf.writeInt16LE(values[i], i * 2);
+            const outPath = path.join(dir, `wave_${String(w.waveformIndex).padStart(3, "0")}.${opts.bitDepth === "samples12" ? "i12" : "i16"}`);
             fs.writeFileSync(outPath, buf);
         }
-        console.log(`Wrote ${waves.length} 12-bit data file(s) to ${dir}/ ` +
-            `(raw little-endian int16 samples, values in range -2048..2047)`);
+        console.log(`Wrote ${waves.length} ${opts.bitDepth === "samples12" ? "12-bit" : "16-bit"} data file(s) to ${dir}/`);
     }
-    if (opts.header16) {
-        const header = (0, cppHeader_1.buildCppHeader)(waves, {
-            which: "samples16",
-            namespaceName: "ProphetVS",
-            arrayPrefix: "wave16",
-            tableName: "kWaves16",
-            provenance: provenance + "\nValues are scaled to 16-bit (sample12 * 16).",
-        });
-        const outPath = path.join(opts.outDir, "prophet_vs_waves_16bit.h");
-        fs.writeFileSync(outPath, header);
-        console.log(`Wrote ${outPath}`);
-    }
-    if (opts.header12) {
-        const header = (0, cppHeader_1.buildCppHeader)(waves, {
-            which: "samples12",
-            namespaceName: "ProphetVS",
-            arrayPrefix: "wave12",
-            tableName: "kWaves12",
-            provenance: provenance + "\nValues are the true 12-bit range (-2048..2047).",
-        });
-        const outPath = path.join(opts.outDir, "prophet_vs_waves_12bit.h");
+    if (hasFlag(argv, "--header")) {
+        const header = (0, exportShared_1.buildHeaderFile)(waves, opts.bitDepth, provenance);
+        const outPath = path.join(opts.outDir, `prophet_vs_waves_${opts.bitDepth === "samples12" ? "12bit" : "16bit"}.h`);
         fs.writeFileSync(outPath, header);
         console.log(`Wrote ${outPath}`);
     }
     if (opts.chart) {
-        const html = (0, chart_1.buildWaveformChartHtml)(waves, {
-            ...chart_1.DEFAULT_CHART_OPTIONS,
-            which: opts.chartWhich,
+        const html = (0, exportShared_1.buildChartFile)(waves, {
+            which: opts.bitDepth,
             columns: opts.chartColumns,
             title: `Prophet VS wavetable — ${waves.length} decoded waveform(s)`,
         });
