@@ -66,7 +66,7 @@ npx ts-node src/convert.ts \
   --all
 ```
 
-Or compile to plain JS first:
+Or compile to plain JS first. Compiling also rebuilds the ui:
 
 ```sh
 npm run build
