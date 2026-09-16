@@ -1,14 +1,17 @@
 # Prophet VS wavetable ROM converter
 
 Decodes the Sequential Prophet VS factory wavetables from ROM images
-into WAV files and C++ headers.
+or VS-WAVES.DAT into raw or WAV files and C++ arrays.
+
+Two versions are included here - a command line converter and a 
+web-based UI. The UI is a single file that can be opened in any browser.
 
 ![Prophet VS waveform chart preview](media/chart_preview_full_1.png)
 
 
 ## Why does this script exist?
 
-The waves are originally stored in the two prophet VS roms (MSB/high and LSB/low).
+The waves are originally stored in the two prophet VS roms (MSB/high/upper and LSB/low).
 
 There are several version of the extracted VS waveforms out there. In particular, I found
 one version with each wave in .AIF format, 336 samples per wave. There are also
@@ -41,11 +44,20 @@ by humans so to speak.
 
 ## Setup
 
+To (re)build the converter, install Node.js and run:
+
 ```sh
 npm install
+npm build
 ```
 
-## Usage
+## Usage, UI version
+
+Open `ui/decoder-ui.html` in any browser. Does not require any setup unless
+you have changed things in the source code. As the UI is a single file, it 
+doesn't hot reload on source changes.
+
+## Usage, command line version
 
 Run directly with `ts-node` (no build step needed):
 
