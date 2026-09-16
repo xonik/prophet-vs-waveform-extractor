@@ -29,9 +29,7 @@ import {
   SLOT_SIZE,
   TABLE_START_BYTES,
   ROM_OFFSET,
-  availableRomSlots,
-  decodeWaveRange,
-  interleaveRom,
+  decodeWaveRangeFromRomPair,
 } from "./decodeROM";
 import { decodeVswaveData } from "./decodeVswave";
 import { DEFAULT_CHART_OPTIONS } from "./chart";
@@ -263,15 +261,19 @@ function main(): void {
   } else {
     const msb = fs.readFileSync(opts.msbPath!);
     const lsb = fs.readFileSync(opts.lsbPath!);
-    const mem = interleaveRom(msb, lsb);
+    const { waves: decodedWaves, swappedRomOrder } = decodeWaveRangeFromRomPair(msb, lsb, opts.startIndex, opts.count);
+    const interleavedLength = msb.length * 2;
+    const nSlots = Math.floor(Math.max(0, interleavedLength - TABLE_START_BYTES) / SLOT_SIZE);
 
-    const nSlots = availableRomSlots(mem);
     console.log(
       `Loaded ${msb.length}-byte MSB + ${lsb.length}-byte LSB ROM images ` +
-        `(${mem.length} bytes interleaved, ${nSlots} wavetable slots available).`
+        `(${interleavedLength} bytes interleaved, ${nSlots} wavetable slots available).`
     );
+    if (swappedRomOrder) {
+      console.log("ROM ordering sanity check failed for the first wave; swapped MSB and LSB inputs automatically.");
+    }
 
-    waves = decodeWaveRange(mem, opts.startIndex, opts.count);
+    waves = decodedWaves;
     provenance =
       `Source: ${path.basename(opts.msbPath!)} / ${path.basename(opts.lsbPath!)}\n` +
       `Generated: ${new Date().toISOString()}\n` +

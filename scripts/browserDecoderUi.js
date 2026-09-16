@@ -1,5 +1,5 @@
 import { buildChartFile, buildCombinedWavBytes, buildHeaderFile, buildRawBytes, buildSeparateWavBytes } from "../src/exportShared";
-import { decodeWaveRange, interleaveRom } from "../src/decodeROM";
+import { decodeWaveRangeFromRomPair } from "../src/decodeROM";
 import { decodeVswaveData } from "../src/decodeVswave";
 import { waveformNames } from "../src/waveformNames";
 
@@ -168,16 +168,22 @@ function setupUi() {
     }
 
     try {
-      decodedWaves = hasRomPair
-        ? decodeWaveRange(
-            interleaveRom(
-              new Uint8Array(await msbFile.arrayBuffer()),
-              new Uint8Array(await lsbFile.arrayBuffer())
-            ),
-            startIndex,
-            count
-          )
-        : decodeVswaveData(new Uint8Array(await vswaveFile.arrayBuffer()), startIndex, count);
+      let statusMessage;
+      if (hasRomPair) {
+        const { waves, swappedRomOrder } = decodeWaveRangeFromRomPair(
+          new Uint8Array(await msbFile.arrayBuffer()),
+          new Uint8Array(await lsbFile.arrayBuffer()),
+          startIndex,
+          count
+        );
+        decodedWaves = waves;
+        statusMessage = swappedRomOrder
+          ? `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}. ROM order sanity check failed, so MSB and LSB were swapped automatically.`
+          : `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+      } else {
+        decodedWaves = decodeVswaveData(new Uint8Array(await vswaveFile.arrayBuffer()), startIndex, count);
+        statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+      }
 
       if (decodedWaves.length === 0) {
         status.textContent = "No valid factory waveforms were decoded for that range.";
@@ -185,7 +191,7 @@ function setupUi() {
         return;
       }
 
-      status.textContent = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+      status.textContent = statusMessage;
       renderResults(decodedWaves, results, bitDepthInput);
       toggleSaveButtons(true);
     } catch (err) {

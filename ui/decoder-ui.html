@@ -646,6 +646,13 @@ ${tiles}
     }
     return mem;
   }
+  function firstWaveOrderingLooksSwapped(mem) {
+    const firstWave = decodeWave(mem, FIRST_FACTORY_WAVE);
+    if (!firstWave) {
+      throw new Error("Unable to decode the first factory waveform for ROM ordering sanity check.");
+    }
+    return firstWave.samples12[0] <= firstWave.samples12[1];
+  }
   function decodeWave(mem, waveformIndex) {
     if (waveformIndex < FIRST_FACTORY_WAVE || waveformIndex > LAST_FACTORY_WAVE) {
       return null;
@@ -689,6 +696,18 @@ ${tiles}
       if (wave) out.push(wave);
     }
     return out;
+  }
+  function decodeWaveRangeFromRomPair(msb, lsb, startIndex, count) {
+    let mem = interleaveRom(msb, lsb);
+    let swappedRomOrder = false;
+    if (firstWaveOrderingLooksSwapped(mem)) {
+      mem = interleaveRom(lsb, msb);
+      swappedRomOrder = true;
+    }
+    return {
+      waves: decodeWaveRange(mem, startIndex, count),
+      swappedRomOrder
+    };
   }
   var TABLE_START_BYTES, SLOT_SIZE, HEAD_SIZE, ROM_OFFSET, FIRST_FACTORY_WAVE, LAST_FACTORY_WAVE;
   var init_decodeROM = __esm({
@@ -3242,20 +3261,26 @@ ${tiles}
             return;
           }
           try {
-            decodedWaves = hasRomPair ? decodeWaveRange(
-              interleaveRom(
+            let statusMessage;
+            if (hasRomPair) {
+              const { waves, swappedRomOrder } = decodeWaveRangeFromRomPair(
                 new Uint8Array(await msbFile.arrayBuffer()),
-                new Uint8Array(await lsbFile.arrayBuffer())
-              ),
-              startIndex,
-              count
-            ) : decodeVswaveData(new Uint8Array(await vswaveFile.arrayBuffer()), startIndex, count);
+                new Uint8Array(await lsbFile.arrayBuffer()),
+                startIndex,
+                count
+              );
+              decodedWaves = waves;
+              statusMessage = swappedRomOrder ? `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}. ROM order sanity check failed, so MSB and LSB were swapped automatically.` : `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+            } else {
+              decodedWaves = decodeVswaveData(new Uint8Array(await vswaveFile.arrayBuffer()), startIndex, count);
+              statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+            }
             if (decodedWaves.length === 0) {
               status.textContent = "No valid factory waveforms were decoded for that range.";
               resetResults();
               return;
             }
-            status.textContent = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+            status.textContent = statusMessage;
             renderResults(decodedWaves, results, bitDepthInput);
             toggleSaveButtons(true);
           } catch (err) {
