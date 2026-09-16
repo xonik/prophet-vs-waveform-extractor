@@ -6,6 +6,11 @@ or VS-WAVES.DAT into raw or WAV files and C++ arrays.
 Two versions are included here - a command line converter and a 
 web-based UI. The UI is a single file that can be opened in any browser.
 
+As with all these projects: you have to supply your own ROM images,
+I can't tell you where to find them but you probably know how to search for 
+things on the net (and if you've found this repo, you probably already have 
+them).
+
 ![Prophet VS waveform chart preview](media/chart_preview_full_1.png)
 
 
