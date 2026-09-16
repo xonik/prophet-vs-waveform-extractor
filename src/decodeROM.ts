@@ -46,6 +46,7 @@ export interface DecodedWave {
 export interface RomDecodeResult {
   waves: DecodedWave[];
   swappedRomOrder: boolean;
+  duplicatedRomInput: boolean;
 }
 
 export const FIRST_FACTORY_WAVE = 32;
@@ -92,6 +93,14 @@ function firstWaveOrderingLooksSwapped(mem: Uint8Array): boolean {
     throw new Error("Unable to decode the first factory waveform for ROM ordering sanity check.");
   }
   return firstWave.samples12[0] <= firstWave.samples12[1];
+}
+
+function hasIdenticalRomInputs(msb: ArrayLike<number>, lsb: ArrayLike<number>): boolean {
+  if (msb.length !== lsb.length) return false;
+  for (let i = 0; i < msb.length; i++) {
+    if (msb[i] !== lsb[i]) return false;
+  }
+  return true;
 }
 
 /** How many ROM slots fit in the given interleaved memory image. */
@@ -169,10 +178,11 @@ export function decodeWaveRangeFromRomPair(
   startIndex: number,
   count: number
 ): RomDecodeResult {
+  const duplicatedRomInput = hasIdenticalRomInputs(msb, lsb);
   let mem = interleaveRom(msb, lsb);
   let swappedRomOrder = false;
 
-  if (firstWaveOrderingLooksSwapped(mem)) {
+  if (!duplicatedRomInput && firstWaveOrderingLooksSwapped(mem)) {
     mem = interleaveRom(lsb, msb);
     swappedRomOrder = true;
   }
@@ -180,5 +190,6 @@ export function decodeWaveRangeFromRomPair(
   return {
     waves: decodeWaveRange(mem, startIndex, count),
     swappedRomOrder,
+    duplicatedRomInput,
   };
 }

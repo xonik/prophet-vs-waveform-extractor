@@ -170,16 +170,22 @@ function setupUi() {
     try {
       let statusMessage;
       if (hasRomPair) {
-        const { waves, swappedRomOrder } = decodeWaveRangeFromRomPair(
+        const { waves, swappedRomOrder, duplicatedRomInput } = decodeWaveRangeFromRomPair(
           new Uint8Array(await msbFile.arrayBuffer()),
           new Uint8Array(await lsbFile.arrayBuffer()),
           startIndex,
           count
         );
         decodedWaves = waves;
-        statusMessage = swappedRomOrder
-          ? `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}. ROM order sanity check failed, so MSB and LSB were swapped automatically.`
-          : `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+        if (duplicatedRomInput) {
+          window.alert("MSB and LSB inputs are identical, which usually means the same file was loaded twice. The waveforms will be jagged and incorrect. ");
+          statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+        } else if (swappedRomOrder) {
+          window.alert("ROM order sanity check failed, so MSB and LSB were swapped automatically. You don't have to do anything to fix this, I just wanted you to know.");
+          statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+        } else {
+          statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;
+        }
       } else {
         decodedWaves = decodeVswaveData(new Uint8Array(await vswaveFile.arrayBuffer()), startIndex, count);
         statusMessage = `Decoded ${decodedWaves.length} waveform(s) from index ${startIndex}.`;

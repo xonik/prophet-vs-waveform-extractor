@@ -52,6 +52,14 @@ interface CliOptions {
   help: boolean;
 }
 
+function printStarNotice(message: string, stream: "log" | "warn" = "log"): void {
+  const lines = message.split("\n");
+  const width = Math.max(...lines.map((line) => line.length), 0);
+  const border = "*".repeat(width + 4);
+  const body = lines.map((line) => `* ${line.padEnd(width, " ")} *`).join("\n");
+  console[stream](`\n${border}\n${body}\n${border}\n`);
+}
+
 function parseArgs(argv: string[]): CliOptions {
   const opts: CliOptions = {
     outDir: "./output",
@@ -261,7 +269,11 @@ function main(): void {
   } else {
     const msb = fs.readFileSync(opts.msbPath!);
     const lsb = fs.readFileSync(opts.lsbPath!);
-    const { waves: decodedWaves, swappedRomOrder } = decodeWaveRangeFromRomPair(msb, lsb, opts.startIndex, opts.count);
+    const {
+      waves: decodedWaves,
+      swappedRomOrder,
+      duplicatedRomInput,
+    } = decodeWaveRangeFromRomPair(msb, lsb, opts.startIndex, opts.count);
     const interleavedLength = msb.length * 2;
     const nSlots = Math.floor(Math.max(0, interleavedLength - TABLE_START_BYTES) / SLOT_SIZE);
 
@@ -269,8 +281,16 @@ function main(): void {
       `Loaded ${msb.length}-byte MSB + ${lsb.length}-byte LSB ROM images ` +
         `(${interleavedLength} bytes interleaved, ${nSlots} wavetable slots available).`
     );
+    if (duplicatedRomInput) {
+      printStarNotice(
+        "Warning: MSB and LSB inputs are identical, which usually means the same file was loaded twice. The waveforms will be jagged and incorrect.",
+        "warn"
+      );
+    }
     if (swappedRomOrder) {
-      console.log("ROM ordering sanity check failed for the first wave; swapped MSB and LSB inputs automatically.");
+      printStarNotice(
+        "ROM order sanity check failed, so MSB and LSB were swapped automatically. You don't have to do anything to fix this, I just wanted you to know."
+      );
     }
 
     waves = decodedWaves;
