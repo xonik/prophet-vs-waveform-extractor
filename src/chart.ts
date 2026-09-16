@@ -1,7 +1,5 @@
 /**
- * Self-contained HTML/SVG waveform chart, generated after conversion so you
- * can eyeball every decoded waveform at a glance without any plotting
- * dependency
+ * Self-contained HTML/SVG waveform chart
  */
 import { DecodedWave } from "./decodeROM";
 import { waveformNames } from "./waveformNames";

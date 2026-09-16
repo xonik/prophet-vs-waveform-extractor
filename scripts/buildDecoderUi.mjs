@@ -238,7 +238,7 @@ const htmlTemplate = `<!doctype html>
           <div>
             <label for="bit-depth">Bit depth in output</label>
             <select id="bit-depth" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:white;">
-              <option value="16">16-bit</option>
+              <option value="16" selected>16-bit</option>
               <option value="12">12-bit</option>
             </select>
           </div>

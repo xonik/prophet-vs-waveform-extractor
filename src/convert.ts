@@ -2,20 +2,20 @@
 /**
  * Prophet VS wavetable ROM converter — CLI entry point.
  *
- * Reads the two factory wavetable ROM images (PVSMSB.BIN / PVSLSB.BIN) or a single VSWAVE.BIN file and
- * emits one or more of:
- *   --wav-combined   one 16-bit WAV file containing every selected waveform back to back
- *   --wav-separate   one 16-bit WAV file per waveform
- *   --header16       one C++ header with each waveform as an inline int16_t[] (16-bit scale)
- *   --data12         one raw binary file per waveform, int16LE samples in the true 12-bit range
- *   --header12       one C++ header with each waveform as an inline int16_t[] (12-bit range)
+ * Reads either the factory ROM pair (PVSMSB.BIN / PVSLSB.BIN) or a VS-WAVES.DAT dump.
+ *
+ * Emits one or more of:
+ *   --wav-combined   one WAV file containing every selected waveform back to back
+ *   --wav-separate   one WAV file per waveform
+ *   --header         one C++ header using the selected bit depth
+ *   --raw            one raw binary file per waveform using the selected bit depth
  *   --chart          one HTML file with a small-multiples SVG chart of every decoded waveform
  *
  * Run with no output flags (or --all) to generate everything.
  *
  * Usage:
  *   npx ts-node src/convert.ts --msb PVSMSB.BIN --lsb PVSLSB.BIN --out ./output --all
- *   npx ts-node src/convert.ts --vswave VS-WAVES.DAT --out ./output --all
+ *   npx ts-node src/convert.ts --vswave VS-WAVES.DAT --out ./output --all --bit-depth 12
  *
  * See README.md for the full option list and background on the ROM format.
  */
