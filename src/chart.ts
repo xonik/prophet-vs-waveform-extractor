@@ -58,10 +58,10 @@ function svgForWave(
 
   return [
     `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`,
-    `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#dddddd"/>`,
-    `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#333333">${waveformIndex} - ${name}</text>`,
-    `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#cccccc" stroke-width="1"/>`,
-    `<polyline points="${points.join(" ")}" fill="none" stroke="#d97706" stroke-width="1.2"/>`,
+    `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" stroke="#d1d5db"/>`,
+    `<text x="${padSide}" y="${padTop}" font-family="monospace" font-size="10" fill="#111827">${waveformIndex} - ${name}</text>`,
+    `<line x1="${padSide}" y1="${zeroY}" x2="${width - padSide}" y2="${zeroY}" stroke="#9ca3af" stroke-width="1"/>`,
+    `<polyline points="${points.join(" ")}" fill="none" stroke="#b91c1c" stroke-width="1.8"/>`,
     `</svg>`,
   ].join("");
 }
@@ -81,18 +81,18 @@ export function buildWaveformChartHtml(
     })
     .join("\n");
 
-  return `<!doctype html>
+ return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>${escapeXml(opts.title)}</title>
 <style>
-  body { margin: 0; padding: 16px 20px; background: #f7f7f5; font-family: -apple-system, Helvetica, Arial, sans-serif; color: #222; }
+  body { margin: 0; padding: 16px 20px; background: #eeeeee; font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111827; }
   h1 { font-size: 16px; margin: 0 0 4px 0; }
-  p.meta { font-size: 12px; color: #666; margin: 0 0 16px 0; }
-  .grid { display: grid; grid-template-columns: repeat(${opts.columns}, ${opts.tileWidth}px); gap: 6px; }
-  .tile { line-height: 0; }
-  .tile svg { display: block; }
+  p.meta { font-size: 12px; color: #374151; margin: 0 0 16px 0; }
+  .grid { display: grid; grid-template-columns: repeat(${opts.columns}, ${opts.tileWidth}px); gap: 8px; }
+  .tile { line-height: 0; background: #ffffff; }
+  .tile svg { display: block; border: 1px solid #d1d5db; }
 </style>
 </head>
 <body>
